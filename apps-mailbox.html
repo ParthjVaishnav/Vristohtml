@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visitor Form</title>
     <style>
+        /* CSS remains unchanged */
         .hide-except-form > *:not(#visitor-form) {
             visibility: hidden;
         }
@@ -239,12 +240,6 @@
                             }
                         }
                         break;
-                    case 'personal_details':
-                    case 'note':
-                        if (value && value.length < 2) {
-                            error = `${name.replace('_', ' ')} must be at least 2 characters`;
-                        }
-                        break;
                     case 'photo':
                         if (value && !value.type.match('image/(jpeg|png)')) {
                             error = 'Please upload a JPEG or PNG image';
@@ -256,13 +251,17 @@
 
             function validateForm() {
                 const newErrors = {};
-                Object.entries(formData).forEach(([key, value]) => {
-                    const error = validateField(key, value);
+                const fieldsToValidate = ['firstName', 'lastName', 'date', 'allocatedTime', 'visitorEmail', 'national_id', 'mobile_number', 'photo'];
+                
+                fieldsToValidate.forEach(key => {
+                    const error = validateField(key, formData[key]);
                     if (error) newErrors[key] = error;
                 });
+                
                 ['firstName', 'lastName', 'date', 'allocatedTime', 'visitorEmail'].forEach(key => {
                     if (!formData[key]) newErrors[key] = `${key.replace('_', ' ')} is required`;
                 });
+                
                 errors = newErrors;
                 return Object.keys(newErrors).length === 0;
             }
@@ -318,9 +317,30 @@
                 render();
 
                 const formDataToSend = new FormData();
-                Object.entries(formData).forEach(([key, value]) => {
-                    if (value !== null) formDataToSend.append(key, value);
+                const fieldMappings = {
+                    firstName: 'firstName',
+                    lastName: 'lastName',
+                    date: 'date',
+                    allocatedTime: 'time',
+                    visitorEmail: 'email',
+                    national_id: 'national_id',
+                    photo: 'photo',
+                    mobile_number: 'mobile_number',
+                    personal_details: 'personal_details',
+                    note: 'note'
+                };
+
+                Object.entries(fieldMappings).forEach(([clientKey, serverKey]) => {
+                    const value = formData[clientKey];
+                    if (value !== null && value !== '') {
+                        formDataToSend.append(serverKey, value);
+                    }
                 });
+
+                console.log('FormData being sent:');
+                for (let [key, value] of formDataToSend.entries()) {
+                    console.log(`${key}: ${typeof value === 'object' ? value.name || value : value}`);
+                }
 
                 try {
                     const response = await fetch('http://192.168.3.77:3001/appointment/create', {
@@ -391,9 +411,9 @@
                                         <div class="field-row">
                                             <label>${field.label}</label>
                                             ${field.type === 'textarea' ? `
-                                                <textarea name="${field.name}" ${field.disabled ? 'disabled' : ''} ${!field.disabled ? 'required' : ''} class="${errors[field.name] ? 'error' : ''}">${formData[field.name]}</textarea>
+                                                <textarea name="${field.name}" ${field.disabled ? 'disabled' : ''} class="${errors[field.name] ? 'error' : ''}">${formData[field.name]}</textarea>
                                             ` : `
-                                                <input type="${field.type || 'text'}" name="${field.name}" value="${formData[field.name]}" ${field.disabled ? 'disabled' : ''} ${!field.disabled ? 'required' : ''} class="${errors[field.name] ? 'error' : ''}">
+                                                <input type="${field.type || 'text'}" name="${field.name}" value="${formData[field.name]}" ${field.disabled ? 'disabled' : ''} ${!field.disabled && field.name !== 'personal_details' && field.name !== 'note' ? 'required' : ''} class="${errors[field.name] ? 'error' : ''}">
                                             `}
                                         </div>
                                         ${errors[field.name] ? `<span class="error-message">${errors[field.name]}</span>` : ''}
@@ -451,9 +471,65 @@
                         if (name === 'national_id' && value && !errors[name]) {
                             await checkNationalId(value);
                         }
-                        render();
+                        updateFormState(e.target); // Call updateFormState instead of render
                     });
                 });
+            }
+
+            // New function to update form state without losing focus
+            function updateFormState(activeInput) {
+                const container = document.getElementById('visitor-form');
+                if (isFormCompleted) {
+                    render();
+                    return;
+                }
+
+                // Update only the changed field's error message and class
+                if (activeInput) {
+                    const fieldContainer = activeInput.closest('.field-container');
+                    if (fieldContainer) {
+                        const errorSpan = fieldContainer.querySelector('.error-message');
+                        if (errorSpan) {
+                            errorSpan.textContent = errors[activeInput.name] || '';
+                        } else if (errors[activeInput.name]) {
+                            fieldContainer.insertAdjacentHTML('beforeend', `<span class="error-message">${errors[activeInput.name]}</span>`);
+                        }
+                        activeInput.classList.toggle('error', !!errors[activeInput.name]);
+                    }
+                }
+
+                // Update photo section if needed
+                const photoContainer = container.querySelector('.field-container:last-child');
+                if (photoContainer) {
+                    const photoButton = photoContainer.querySelector('#photoUpload');
+                    if (photoButton) photoButton.classList.toggle('error', !!errors.photo);
+                    const photoOptions = photoContainer.querySelector('.photo-options');
+                    if (photoOptions) photoOptions.style.display = showPhotoOptions ? 'block' : 'none';
+                    const photoStatus = photoContainer.querySelector('span[style*="font-size: 0.9rem"]');
+                    if (photoStatus) photoStatus.textContent = formData.photo ? `Selected: ${formData.photo.name}` : '';
+                }
+
+                // Update submit button
+                const submitBtn = container.querySelector('.submit-btn');
+                if (submitBtn) {
+                    submitBtn.disabled = loading;
+                    submitBtn.textContent = loading ? 'Processing...' : 'Submit';
+                }
+
+                // Update error message
+                let errorP = container.querySelector('p[style*="color: red"]');
+                if (errorMessage) {
+                    if (errorP) {
+                        errorP.textContent = errorMessage;
+                    } else {
+                        container.querySelector('form').insertAdjacentHTML('afterend', `<p style="text-align: center; margin-top: 1.5rem; color: red; font-weight: bold;">${errorMessage}</p>`);
+                    }
+                } else if (errorP) {
+                    errorP.remove();
+                }
+
+                // Restore focus to the active input
+                if (activeInput) activeInput.focus();
             }
 
             checkFormStatus();
