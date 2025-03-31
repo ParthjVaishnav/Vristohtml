@@ -200,6 +200,10 @@
             let showPhotoOptions = false;
             let isFormCompleted = false;
 
+            // Add local storage check for completion status
+            const formKey = `${formData.visitorEmail}-${formData.date}-${formData.allocatedTime}`;
+            isFormCompleted = localStorage.getItem(`formCompleted_${formKey}`) === 'true';
+
             function formatTime(rawTime) {
                 if (!rawTime) return '';
                 const timeParts = rawTime.split(' ');
@@ -271,6 +275,7 @@
                     const response = await fetch(`http://192.168.3.77:3001/appointment/check-status?email=${formData.visitorEmail}&date=${formData.date}&time=${formData.allocatedTime}`);
                     const data = await response.json();
                     isFormCompleted = data.isFormCompleted;
+                    localStorage.setItem(`formCompleted_${formKey}`, isFormCompleted); // Cache status
                     render();
                 } catch (error) {
                     console.error('Error checking form status:', error);
@@ -351,6 +356,7 @@
                     if (response.ok) {
                         successMessage = 'Your Appointment Scheduled Successfully';
                         isFormCompleted = true;
+                        localStorage.setItem(`formCompleted_${formKey}`, 'true'); // Mark as completed
                         formData = {
                             firstName: '',
                             lastName: '',
@@ -471,12 +477,11 @@
                         if (name === 'national_id' && value && !errors[name]) {
                             await checkNationalId(value);
                         }
-                        updateFormState(e.target); // Call updateFormState instead of render
+                        updateFormState(e.target);
                     });
                 });
             }
 
-            // New function to update form state without losing focus
             function updateFormState(activeInput) {
                 const container = document.getElementById('visitor-form');
                 if (isFormCompleted) {
@@ -484,7 +489,6 @@
                     return;
                 }
 
-                // Update only the changed field's error message and class
                 if (activeInput) {
                     const fieldContainer = activeInput.closest('.field-container');
                     if (fieldContainer) {
@@ -498,7 +502,6 @@
                     }
                 }
 
-                // Update photo section if needed
                 const photoContainer = container.querySelector('.field-container:last-child');
                 if (photoContainer) {
                     const photoButton = photoContainer.querySelector('#photoUpload');
@@ -509,14 +512,12 @@
                     if (photoStatus) photoStatus.textContent = formData.photo ? `Selected: ${formData.photo.name}` : '';
                 }
 
-                // Update submit button
                 const submitBtn = container.querySelector('.submit-btn');
                 if (submitBtn) {
                     submitBtn.disabled = loading;
                     submitBtn.textContent = loading ? 'Processing...' : 'Submit';
                 }
 
-                // Update error message
                 let errorP = container.querySelector('p[style*="color: red"]');
                 if (errorMessage) {
                     if (errorP) {
@@ -528,11 +529,14 @@
                     errorP.remove();
                 }
 
-                // Restore focus to the active input
                 if (activeInput) activeInput.focus();
             }
 
-            checkFormStatus();
+            // Render immediately based on local storage, then verify with server if not completed
+            render();
+            if (!isFormCompleted) {
+                checkFormStatus();
+            }
         });
     </script>
 </body>
