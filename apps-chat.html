@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule an Appointment</title>
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: white;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            background: linear-gradient(to right, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        label {
+            font-weight: bold;
+            font-size: 1rem;
+            color: #333;
+        }
+        input {
+            padding: 12px 15px;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: #f8f9fa;
+            width: 100%;
+        }
+        .error {
+            color: red;
+            font-size: 0.8rem;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(to right, #667eea, #764ba2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        .message {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            color: #28a745;
+            background: #e6ffe6;
+        }
+        .error-msg {
+            color: #dc3545;
+            background: #ffe6e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Schedule an Appointment</h1>
+        <form id="appointmentForm">
+            <div class="form-group">
+                <label>First Name</label>
+                <input type="text" id="firstName" required>
+                <span class="error" id="firstNameError"></span>
+            </div>
+            <div class="form-group">
+                <label>Last Name</label>
+                <input type="text" id="lastName" required>
+                <span class="error" id="lastNameError"></span>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="date" required>
+                <span class="error" id="dateError"></span>
+            </div>
+            <div class="form-group">
+                <label>Allocated Time</label>
+                <input type="time" id="allocatedTime" required>
+                <span class="error" id="allocatedTimeError"></span>
+            </div>
+            <div class="form-group">
+                <label>Visitor Email</label>
+                <input type="email" id="visitorEmail" required>
+                <span class="error" id="visitorEmailError"></span>
+            </div>
+            <button type="submit">Schedule Appointment</button>
+        </form>
+        <p id="successMessage" class="message success" style="display: none;"></p>
+        <p id="errorMessage" class="message error-msg" style="display: none;"></p>
+    </div>
+
+    <<script>
+        document.getElementById('appointmentForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+    
+            // Reset error messages
+            document.querySelectorAll('.error').forEach(el => el.innerText = '');
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+    
+            let firstName = document.getElementById('firstName').value.trim();
+            let lastName = document.getElementById('lastName').value.trim();
+            let date = document.getElementById('date').value;
+            let allocatedTime = document.getElementById('allocatedTime').value;
+            let visitorEmail = document.getElementById('visitorEmail').value.trim();
+    
+            let errors = {};
+            if (!/^[a-zA-Z\s]{2,}$/.test(firstName)) errors.firstName = 'First name must be at least 2 characters and contain only letters';
+            if (!/^[a-zA-Z\s]{2,}$/.test(lastName)) errors.lastName = 'Last name must be at least 2 characters and contain only letters';
+            if (!/^\S+@\S+\.\S+$/.test(visitorEmail)) errors.visitorEmail = 'Please enter a valid email address';
+    
+            let today = new Date();
+            today.setHours(0, 0, 0, 0);
+            let selectedDate = new Date(date);
+            selectedDate.setHours(0, 0, 0, 0);
+            if (selectedDate < today) errors.date = 'Date must be today or later';
+    
+            if (Object.keys(errors).length > 0) {
+                for (let key in errors) {
+                    document.getElementById(`${key}Error`).innerText = errors[key];
+                }
+                return;
+            }
+    
+            let formData = { firstName, lastName, date, allocatedTime, visitorEmail };
+            try {
+                let response = await fetch('http://192.168.3.77:3001/appointment/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+    
+                if (!response.ok) {
+                    throw new Error('Failed to schedule appointment. Please try again.');
+                }
+    
+                let result = await response.json();
+                document.getElementById('successMessage').innerText = 'Appointment scheduled successfully!';
+                document.getElementById('successMessage').style.display = 'block';
+                document.getElementById('appointmentForm').reset();
+            } catch (error) {
+                document.getElementById('errorMessage').innerText = error.message;
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+        });
+    </script>
+    
+</body>
+</html>
